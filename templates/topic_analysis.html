@@ -1,0 +1,493 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Topic Analysis - RiskRadar</title>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.1.3/dist/css/bootstrap.min.css" rel="stylesheet">
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" rel="stylesheet">
+    <style>
+        .analysis-card {
+            border-left: 4px solid #007bff;
+            transition: all 0.3s ease;
+        }
+        .analysis-card:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 4px 8px rgba(0,0,0,0.1);
+        }
+        .risk-critical { border-left-color: #dc3545; }
+        .risk-high { border-left-color: #fd7e14; }
+        .risk-medium { border-left-color: #ffc107; }
+        .risk-low { border-left-color: #28a745; }
+        .loading-spinner {
+            display: none;
+        }
+        .results-section {
+            display: none;
+        }
+        .trending-topic {
+            cursor: pointer;
+            transition: background-color 0.2s;
+        }
+        .trending-topic:hover {
+            background-color: #f8f9fa;
+        }
+        .keyword-tag {
+            background-color: #e9ecef;
+            border-radius: 15px;
+            padding: 4px 12px;
+            margin: 2px;
+            display: inline-block;
+            font-size: 0.85em;
+        }
+        .analysis-summary {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            border-radius: 10px;
+            padding: 20px;
+            margin-bottom: 20px;
+        }
+    </style>
+</head>
+<body>
+    <nav class="navbar navbar-expand-lg navbar-dark bg-dark">
+        <div class="container">
+            <a class="navbar-brand" href="/">
+                <i class="fas fa-shield-alt me-2"></i>RiskRadar
+            </a>
+            <div class="navbar-nav ms-auto">
+                <a class="nav-link" href="/">Dashboard</a>
+                <a class="nav-link" href="/sources">Sources</a>
+                <a class="nav-link" href="/threats">Threats</a>
+                <a class="nav-link active" href="/topic-analysis">Topic Analysis</a>
+            </div>
+        </div>
+    </nav>
+
+    <div class="container mt-4">
+        <!-- Header -->
+        <div class="row mb-4">
+            <div class="col-12">
+                <h1><i class="fas fa-search me-2"></i>Topic-Based Threat Analysis</h1>
+                <p class="text-muted">Enter a topic to scan for security threats and get real-time analysis from web discussions.</p>
+            </div>
+        </div>
+
+        <!-- Topic Input Form -->
+        <div class="row mb-4">
+            <div class="col-lg-8">
+                <div class="card">
+                    <div class="card-header">
+                        <h5><i class="fas fa-keyboard me-2"></i>Analyze Security Threats for a Topic</h5>
+                    </div>
+                    <div class="card-body">
+                        <form id="topicAnalysisForm">
+                            <div class="mb-3">
+                                <label for="topicInput" class="form-label">Topic to Analyze</label>
+                                <input type="text" class="form-control" id="topicInput" 
+                                       placeholder="e.g., ransomware, data breach, phishing, zero-day exploit" 
+                                       required minlength="2" maxlength="200">
+                                <div class="form-text">Enter a cybersecurity topic, technology, or threat type to analyze</div>
+                            </div>
+                            
+                            <div class="mb-3">
+                                <label for="keywordsInput" class="form-label">Additional Keywords (Optional)</label>
+                                <input type="text" class="form-control" id="keywordsInput" 
+                                       placeholder="e.g., vulnerability, attack, malware (comma-separated)">
+                                <div class="form-text">Add specific keywords to refine your search</div>
+                            </div>
+
+                            <div class="row mb-3">
+                                <div class="col-md-6">
+                                    <label for="maxResults" class="form-label">Max Results</label>
+                                    <select class="form-select" id="maxResults">
+                                        <option value="25">25 results</option>
+                                        <option value="50" selected>50 results</option>
+                                        <option value="100">100 results</option>
+                                        <option value="200">200 results</option>
+                                    </select>
+                                </div>
+                                <div class="col-md-6">
+                                    <label for="timeRange" class="form-label">Time Range</label>
+                                    <select class="form-select" id="timeRange">
+                                        <option value="6">Last 6 hours</option>
+                                        <option value="24" selected>Last 24 hours</option>
+                                        <option value="72">Last 3 days</option>
+                                        <option value="168">Last week</option>
+                                    </select>
+                                </div>
+                            </div>
+
+                            <div class="mb-3">
+                                <label class="form-label">Source Types</label>
+                                <div class="row">
+                                    <div class="col-md-3">
+                                        <div class="form-check">
+                                            <input class="form-check-input" type="checkbox" id="sourceNews" value="news" checked>
+                                            <label class="form-check-label" for="sourceNews">News</label>
+                                        </div>
+                                    </div>
+                                    <div class="col-md-3">
+                                        <div class="form-check">
+                                            <input class="form-check-input" type="checkbox" id="sourceGov" value="government" checked>
+                                            <label class="form-check-label" for="sourceGov">Government</label>
+                                        </div>
+                                    </div>
+                                    <div class="col-md-3">
+                                        <div class="form-check">
+                                            <input class="form-check-input" type="checkbox" id="sourceSocial" value="social_media" checked>
+                                            <label class="form-check-label" for="sourceSocial">Social Media</label>
+                                        </div>
+                                    </div>
+                                    <div class="col-md-3">
+                                        <div class="form-check">
+                                            <input class="form-check-input" type="checkbox" id="sourceBlog" value="blog" checked>
+                                            <label class="form-check-label" for="sourceBlog">Blogs</label>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+
+                            <button type="submit" class="btn btn-primary btn-lg">
+                                <i class="fas fa-search me-2"></i>Start Analysis
+                            </button>
+                        </form>
+
+                        <!-- Loading State -->
+                        <div class="loading-spinner text-center mt-4">
+                            <div class="spinner-border text-primary" role="status">
+                                <span class="visually-hidden">Loading...</span>
+                            </div>
+                            <p class="mt-2">Analyzing web discussions for threats... This may take 2-5 minutes.</p>
+                            <div class="progress mt-3">
+                                <div class="progress-bar progress-bar-striped progress-bar-animated" 
+                                     role="progressbar" style="width: 100%"></div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Trending Topics Sidebar -->
+            <div class="col-lg-4">
+                <div class="card">
+                    <div class="card-header">
+                        <h6><i class="fas fa-fire me-2"></i>Trending Security Topics</h6>
+                    </div>
+                    <div class="card-body">
+                        <div id="trendingTopics">
+                            <div class="text-center">
+                                <div class="spinner-border spinner-border-sm" role="status">
+                                    <span class="visually-hidden">Loading...</span>
+                                </div>
+                                <p class="small mt-2">Loading trending topics...</p>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Quick Examples -->
+                <div class="card mt-3">
+                    <div class="card-header">
+                        <h6><i class="fas fa-lightbulb me-2"></i>Example Topics</h6>
+                    </div>
+                    <div class="card-body">
+                        <div class="d-grid gap-2">
+                            <button class="btn btn-outline-secondary btn-sm example-topic" data-topic="ransomware">Ransomware</button>
+                            <button class="btn btn-outline-secondary btn-sm example-topic" data-topic="data breach">Data Breach</button>
+                            <button class="btn btn-outline-secondary btn-sm example-topic" data-topic="phishing">Phishing</button>
+                            <button class="btn btn-outline-secondary btn-sm example-topic" data-topic="zero-day">Zero-day Exploit</button>
+                            <button class="btn btn-outline-secondary btn-sm example-topic" data-topic="supply chain attack">Supply Chain Attack</button>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Analysis Results -->
+        <div class="results-section">
+            <div class="analysis-summary" id="analysisSummary">
+                <!-- Analysis summary will be populated here -->
+            </div>
+
+            <div class="row">
+                <!-- Key Findings -->
+                <div class="col-lg-6">
+                    <div class="card analysis-card mb-4">
+                        <div class="card-header">
+                            <h5><i class="fas fa-exclamation-triangle me-2"></i>Key Findings</h5>
+                        </div>
+                        <div class="card-body">
+                            <ul id="keyFindings" class="list-unstyled">
+                                <!-- Key findings will be populated here -->
+                            </ul>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Recommendations -->
+                <div class="col-lg-6">
+                    <div class="card analysis-card mb-4">
+                        <div class="card-header">
+                            <h5><i class="fas fa-tasks me-2"></i>Recommended Actions</h5>
+                        </div>
+                        <div class="card-body">
+                            <ul id="recommendations" class="list-unstyled">
+                                <!-- Recommendations will be populated here -->
+                            </ul>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Detailed Results -->
+            <div class="card analysis-card">
+                <div class="card-header">
+                    <h5><i class="fas fa-list me-2"></i>Detailed Threat Analysis Results</h5>
+                </div>
+                <div class="card-body">
+                    <div id="detailedResults">
+                        <!-- Detailed results will be populated here -->
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.1.3/dist/js/bootstrap.bundle.min.js"></script>
+    <script>
+        let currentAnalysisTopic = null;
+        let analysisCheckInterval = null;
+
+        // Load trending topics on page load
+        document.addEventListener('DOMContentLoaded', function() {
+            loadTrendingTopics();
+        });
+
+        // Handle form submission
+        document.getElementById('topicAnalysisForm').addEventListener('submit', function(e) {
+            e.preventDefault();
+            startTopicAnalysis();
+        });
+
+        // Handle example topic clicks
+        document.querySelectorAll('.example-topic').forEach(button => {
+            button.addEventListener('click', function() {
+                const topic = this.getAttribute('data-topic');
+                document.getElementById('topicInput').value = topic;
+                startTopicAnalysis();
+            });
+        });
+
+        async function startTopicAnalysis() {
+            const topic = document.getElementById('topicInput').value.trim();
+            if (!topic) {
+                alert('Please enter a topic to analyze');
+                return;
+            }
+
+            // Get form data
+            const keywords = document.getElementById('keywordsInput').value
+                .split(',')
+                .map(k => k.trim())
+                .filter(k => k.length > 0);
+            
+            const maxResults = parseInt(document.getElementById('maxResults').value);
+            const timeRange = parseInt(document.getElementById('timeRange').value);
+            
+            const sourceTypes = [];
+            document.querySelectorAll('input[type="checkbox"]:checked').forEach(cb => {
+                sourceTypes.push(cb.value);
+            });
+
+            // Show loading state
+            document.querySelector('.loading-spinner').style.display = 'block';
+            document.querySelector('.results-section').style.display = 'none';
+
+            try {
+                // Start analysis
+                const response = await fetch('/api/topic-analysis/scan', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                    },
+                    body: JSON.stringify({
+                        topic: topic,
+                        keywords: keywords.length > 0 ? keywords : null,
+                        source_types: sourceTypes.length > 0 ? sourceTypes : null,
+                        max_results: maxResults,
+                        time_range_hours: timeRange
+                    })
+                });
+
+                if (response.ok) {
+                    const result = await response.json();
+                    currentAnalysisTopic = topic;
+                    
+                    // Start checking for results
+                    analysisCheckInterval = setInterval(checkAnalysisResults, 5000);
+                    
+                    // Also check immediately after a delay
+                    setTimeout(checkAnalysisResults, 10000);
+                } else {
+                    throw new Error('Failed to start analysis');
+                }
+            } catch (error) {
+                console.error('Error starting analysis:', error);
+                alert('Failed to start analysis. Please try again.');
+                document.querySelector('.loading-spinner').style.display = 'none';
+            }
+        }
+
+        async function checkAnalysisResults() {
+            if (!currentAnalysisTopic) return;
+
+            try {
+                const response = await fetch(`/api/topic-analysis/results/${encodeURIComponent(currentAnalysisTopic)}`);
+                
+                if (response.ok) {
+                    const results = await response.json();
+                    
+                    // Check if analysis is complete (either has results or explicitly completed)
+                    if (results.total_articles_found >= 0 && results.analysis_timestamp) {
+                        displayResults(results);
+                        clearInterval(analysisCheckInterval);
+                        document.querySelector('.loading-spinner').style.display = 'none';
+                        document.querySelector('.results-section').style.display = 'block';
+                    }
+                }
+            } catch (error) {
+                console.error('Error checking results:', error);
+            }
+        }
+
+        function displayResults(results) {
+            // Handle case when no articles are found
+            const articlesFound = results.total_articles_found || 0;
+            const sourcesScanned = results.total_sources_scanned || 0;
+            const riskLevel = results.risk_level || 'low';
+            const sentiment = results.sentiment_analysis?.overall || 'neutral';
+            
+            // Update analysis summary
+            const summaryHtml = `
+                <div class="row">
+                    <div class="col-md-3">
+                        <h4>${articlesFound}</h4>
+                        <small>Articles Found</small>
+                    </div>
+                    <div class="col-md-3">
+                        <h4>${sourcesScanned}</h4>
+                        <small>Sources Scanned</small>
+                    </div>
+                    <div class="col-md-3">
+                        <h4 class="text-${getRiskColor(riskLevel)}">${riskLevel.toUpperCase()}</h4>
+                        <small>Risk Level</small>
+                    </div>
+                    <div class="col-md-3">
+                        <h4>${sentiment.toUpperCase()}</h4>
+                        <small>Overall Sentiment</small>
+                    </div>
+                </div>
+                <hr class="my-3" style="border-color: rgba(255,255,255,0.3);">
+                <h5><i class="fas fa-search me-2"></i>Analysis for: "${results.topic}"</h5>
+                <p class="mb-0">Completed at ${new Date(results.analysis_timestamp).toLocaleString()}</p>
+            `;
+            document.getElementById('analysisSummary').innerHTML = summaryHtml;
+
+            // Update key findings
+            const keyFindings = results.key_findings || [];
+            const findingsHtml = keyFindings.length > 0 
+                ? keyFindings.map(finding => 
+                    `<li class="mb-2"><i class="fas fa-chevron-right me-2 text-primary"></i>${finding}</li>`
+                  ).join('')
+                : '<li class="mb-2 text-muted"><i class="fas fa-info-circle me-2"></i>No specific threats detected for this topic</li>';
+            document.getElementById('keyFindings').innerHTML = findingsHtml;
+
+            // Update recommendations
+            const recommendedActions = results.recommended_actions || [];
+            const recommendationsHtml = recommendedActions.length > 0
+                ? recommendedActions.map(action => 
+                    `<li class="mb-2"><i class="fas fa-check me-2 text-success"></i>${action}</li>`
+                  ).join('')
+                : '<li class="mb-2 text-muted"><i class="fas fa-shield-alt me-2"></i>Continue monitoring this topic for emerging threats</li>';
+            document.getElementById('recommendations').innerHTML = recommendationsHtml;
+
+            // Update detailed results
+            const detailedResults = results.detailed_results || [];
+            const detailedHtml = detailedResults.length > 0 
+                ? detailedResults.map(item => `
+                    <div class="card mb-3 border-start border-${getRiskColor(item.severity)} border-3">
+                        <div class="card-body">
+                            <div class="row">
+                                <div class="col-md-8">
+                                    <h6 class="card-title">${item.title}</h6>
+                                    <p class="card-text text-muted">${item.summary}</p>
+                                    <small class="text-muted">
+                                        <i class="fas fa-source me-1"></i>${item.source} • 
+                                        <i class="fas fa-clock me-1"></i>${new Date(item.detected_at).toLocaleString()}
+                                    </small>
+                                </div>
+                                <div class="col-md-4 text-end">
+                                    <span class="badge bg-${getRiskColor(item.severity)} mb-2">${item.severity.toUpperCase()}</span><br>
+                                    ${item.url ? `<a href="${item.url}" target="_blank" class="btn btn-sm btn-outline-primary">View Source</a>` : ''}
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                  `).join('')
+                : `<div class="text-center py-4">
+                     <i class="fas fa-search fa-3x text-muted mb-3"></i>
+                     <h5 class="text-muted">No threats detected</h5>
+                     <p class="text-muted">No security threats were found for "${results.topic}" in the analyzed sources.</p>
+                   </div>`;
+            document.getElementById('detailedResults').innerHTML = detailedHtml;
+        }
+
+        function getRiskColor(risk) {
+            switch(risk) {
+                case 'critical': return 'danger';
+                case 'high': return 'warning';
+                case 'medium': return 'info';
+                case 'low': return 'success';
+                default: return 'secondary';
+            }
+        }
+
+        async function loadTrendingTopics() {
+            try {
+                const response = await fetch('/api/topic-analysis/trending-topics');
+                if (response.ok) {
+                    const data = await response.json();
+                    displayTrendingTopics(data.trending_topics);
+                }
+            } catch (error) {
+                console.error('Error loading trending topics:', error);
+                document.getElementById('trendingTopics').innerHTML = '<p class="text-muted small">Unable to load trending topics</p>';
+            }
+        }
+
+        function displayTrendingTopics(topics) {
+            if (!topics || topics.length === 0) {
+                document.getElementById('trendingTopics').innerHTML = '<p class="text-muted small">No trending topics found</p>';
+                return;
+            }
+
+            const topicsHtml = topics.map(topic => `
+                <div class="trending-topic p-2 border-bottom" onclick="selectTrendingTopic('${topic.topic}')">
+                    <div class="d-flex justify-content-between align-items-center">
+                        <span class="fw-bold">${topic.topic}</span>
+                        <span class="badge bg-${topic.risk_indicator === 'medium' ? 'warning' : 'secondary'}">${topic.mentions}</span>
+                    </div>
+                </div>
+            `).join('');
+
+            document.getElementById('trendingTopics').innerHTML = topicsHtml;
+        }
+
+        function selectTrendingTopic(topic) {
+            document.getElementById('topicInput').value = topic;
+            startTopicAnalysis();
+        }
+    </script>
+</body>
+</html>

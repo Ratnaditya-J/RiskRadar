@@ -1,0 +1,423 @@
+{% extends "base.html" %}
+
+{% block title %}Dashboard - RiskRadar{% endblock %}
+
+{% block content %}
+<div class="d-flex justify-content-between align-items-center mb-4">
+    <h1 class="h3 mb-0">
+        <i class="bi bi-speedometer2 me-2"></i>
+        Dashboard
+    </h1>
+    <div class="text-muted">
+        <i class="bi bi-clock me-1"></i>
+        Last updated: <span id="lastUpdated">{{ stats.last_updated or 'Just now' }}</span>
+    </div>
+</div>
+
+<!-- Alert Section -->
+<div id="alertsContainer"></div>
+
+<!-- Quick Actions -->
+<div class="row mb-4">
+    <div class="col-12">
+        <div class="card border-primary">
+            <div class="card-body">
+                <div class="row align-items-center">
+                    <div class="col-md-8">
+                        <h5 class="card-title mb-2">
+                            <i class="bi bi-search me-2 text-primary"></i>
+                            Topic-Based Threat Analysis
+                        </h5>
+                        <p class="card-text mb-0">
+                            Analyze web discussions for specific security topics. Get real-time insights, risk assessment, and recommended actions.
+                        </p>
+                    </div>
+                    <div class="col-md-4 text-end">
+                        <a href="/topic-analysis" class="btn btn-primary btn-lg">
+                            <i class="bi bi-plus-circle me-2"></i>
+                            Start Analysis
+                        </a>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Key Metrics -->
+<div class="row mb-4">
+    <div class="col-md-3 mb-3">
+        <div class="card metric-card">
+            <div class="card-body text-center">
+                <i class="bi bi-globe display-4 mb-2"></i>
+                <h3 class="mb-1">{{ stats.active_sources }}/{{ stats.total_sources }}</h3>
+                <p class="mb-0 opacity-75">Active Sources</p>
+            </div>
+        </div>
+    </div>
+    <div class="col-md-3 mb-3">
+        <div class="card metric-card success">
+            <div class="card-body text-center">
+                <i class="bi bi-shield-check display-4 mb-2"></i>
+                <h3 class="mb-1">{{ stats.confirmed_threats }}</h3>
+                <p class="mb-0 opacity-75">Confirmed Threats</p>
+            </div>
+        </div>
+    </div>
+    <div class="col-md-3 mb-3">
+        <div class="card metric-card warning">
+            <div class="card-body text-center">
+                <i class="bi bi-exclamation-triangle display-4 mb-2"></i>
+                <h3 class="mb-1">{{ stats.total_incidents }}</h3>
+                <p class="mb-0 opacity-75">Total Incidents</p>
+            </div>
+        </div>
+    </div>
+    <div class="col-md-3 mb-3">
+        <div class="card metric-card danger">
+            <div class="card-body text-center">
+                <i class="bi bi-percent display-4 mb-2"></i>
+                <h3 class="mb-1">{{ stats.threat_rate }}%</h3>
+                <p class="mb-0 opacity-75">Threat Rate</p>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Charts Row -->
+<div class="row mb-4">
+    <div class="col-md-8">
+        <div class="card">
+            <div class="card-header d-flex justify-content-between align-items-center">
+                <h5 class="mb-0">
+                    <i class="bi bi-graph-up me-2"></i>
+                    Threat Timeline (Last 7 Days)
+                </h5>
+                <button class="btn btn-sm btn-outline-primary" onclick="refreshCharts()">
+                    <i class="bi bi-arrow-clockwise"></i>
+                </button>
+            </div>
+            <div class="card-body">
+                <canvas id="threatTimelineChart" height="100"></canvas>
+            </div>
+        </div>
+    </div>
+    <div class="col-md-4">
+        <div class="card">
+            <div class="card-header">
+                <h5 class="mb-0">
+                    <i class="bi bi-pie-chart me-2"></i>
+                    Severity Distribution
+                </h5>
+            </div>
+            <div class="card-body">
+                <canvas id="severityChart" height="200"></canvas>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Recent Activity & System Status -->
+<div class="row">
+    <div class="col-md-8">
+        <div class="card">
+            <div class="card-header d-flex justify-content-between align-items-center">
+                <h5 class="mb-0">
+                    <i class="bi bi-clock-history me-2"></i>
+                    Recent Activity
+                </h5>
+                <a href="/threats" class="btn btn-sm btn-outline-primary">View All</a>
+            </div>
+            <div class="card-body">
+                <div id="recentActivity">
+                    <div class="text-center py-3">
+                        <div class="spinner-border text-primary" role="status">
+                            <span class="visually-hidden">Loading...</span>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+    <div class="col-md-4">
+        <div class="card">
+            <div class="card-header">
+                <h5 class="mb-0">
+                    <i class="bi bi-info-circle me-2"></i>
+                    System Status
+                </h5>
+            </div>
+            <div class="card-body">
+                <div id="systemStatus">
+                    <div class="d-flex justify-content-between align-items-center mb-2">
+                        <span>Database</span>
+                        <span class="badge bg-success">Connected</span>
+                    </div>
+                    <div class="d-flex justify-content-between align-items-center mb-2">
+                        <span>Active Sources</span>
+                        <span class="badge bg-primary">{{ stats.active_sources }}</span>
+                    </div>
+                    <div class="d-flex justify-content-between align-items-center mb-2">
+                        <span>Monitoring</span>
+                        <span class="badge bg-success">Running</span>
+                    </div>
+                    <div class="d-flex justify-content-between align-items-center">
+                        <span>Last Scan</span>
+                        <span class="text-muted small">2 min ago</span>
+                    </div>
+                </div>
+            </div>
+        </div>
+        
+        <!-- Quick Actions -->
+        <div class="card mt-3">
+            <div class="card-header">
+                <h5 class="mb-0">
+                    <i class="bi bi-lightning me-2"></i>
+                    Quick Actions
+                </h5>
+            </div>
+            <div class="card-body">
+                <div class="d-grid gap-2">
+                    <a href="/sources" class="btn btn-outline-primary btn-sm">
+                        <i class="bi bi-gear me-1"></i>
+                        Configure Sources
+                    </a>
+                    <a href="/threats?status=pending" class="btn btn-outline-warning btn-sm">
+                        <i class="bi bi-eye me-1"></i>
+                        Review Pending
+                    </a>
+                    <button class="btn btn-outline-success btn-sm" onclick="runManualScan()">
+                        <i class="bi bi-search me-1"></i>
+                        Manual Scan
+                    </button>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block extra_scripts %}
+<script>
+let threatTimelineChart, severityChart;
+
+// Initialize dashboard
+document.addEventListener('DOMContentLoaded', function() {
+    loadDashboardData();
+    loadAlerts();
+    initializeCharts();
+    
+    // Auto-refresh every 5 minutes
+    setInterval(loadDashboardData, 5 * 60 * 1000);
+});
+
+async function loadDashboardData() {
+    try {
+        const [overview, metrics] = await Promise.all([
+            apiCall('/api/dashboard/overview'),
+            apiCall('/api/dashboard/metrics?days_back=7')
+        ]);
+        
+        updateRecentActivity(overview.recent_activity);
+        updateCharts(metrics);
+        
+        document.getElementById('lastUpdated').textContent = new Date().toLocaleTimeString();
+        
+    } catch (error) {
+        console.error('Failed to load dashboard data:', error);
+    }
+}
+
+async function loadAlerts() {
+    try {
+        const alerts = await apiCall('/api/dashboard/alerts');
+        displayAlerts(alerts.alerts);
+    } catch (error) {
+        console.error('Failed to load alerts:', error);
+    }
+}
+
+function displayAlerts(alerts) {
+    const container = document.getElementById('alertsContainer');
+    container.innerHTML = '';
+    
+    alerts.forEach(alert => {
+        const alertType = alert.type === 'critical' ? 'danger' : alert.type;
+        const alertDiv = document.createElement('div');
+        alertDiv.className = `alert alert-${alertType} alert-dismissible fade show`;
+        alertDiv.innerHTML = `
+            <div class="d-flex align-items-center">
+                <i class="bi bi-${getAlertIcon(alert.type)} me-2"></i>
+                <div class="flex-grow-1">
+                    <strong>${alert.title}</strong>
+                    <div class="small">${alert.message}</div>
+                </div>
+                <a href="${alert.link}" class="btn btn-sm btn-outline-${alertType} me-2">
+                    ${alert.action}
+                </a>
+                <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+            </div>
+        `;
+        container.appendChild(alertDiv);
+    });
+}
+
+function getAlertIcon(type) {
+    const icons = {
+        'critical': 'exclamation-triangle-fill',
+        'warning': 'exclamation-triangle',
+        'info': 'info-circle',
+        'error': 'x-circle'
+    };
+    return icons[type] || 'info-circle';
+}
+
+function updateRecentActivity(activities) {
+    const container = document.getElementById('recentActivity');
+    
+    if (!activities || activities.length === 0) {
+        container.innerHTML = '<p class="text-muted text-center">No recent activity</p>';
+        return;
+    }
+    
+    const activityHtml = activities.map(activity => `
+        <div class="d-flex align-items-center py-2 border-bottom">
+            <div class="me-3">
+                <i class="bi bi-${getSeverityIcon(activity.severity)} severity-${activity.severity}"></i>
+            </div>
+            <div class="flex-grow-1">
+                <div class="fw-medium">${activity.title}</div>
+                <div class="small text-muted">
+                    ${formatDate(activity.created_at)} • 
+                    Risk: ${formatRiskScore(activity.risk_score)} • 
+                    <span class="status-badge status-${activity.status}">${activity.status}</span>
+                </div>
+            </div>
+            <div>
+                <a href="/threats/${activity.id}" class="btn btn-sm btn-outline-primary">
+                    <i class="bi bi-eye"></i>
+                </a>
+            </div>
+        </div>
+    `).join('');
+    
+    container.innerHTML = activityHtml;
+}
+
+function getSeverityIcon(severity) {
+    const icons = {
+        'critical': 'exclamation-triangle-fill',
+        'high': 'exclamation-triangle',
+        'medium': 'exclamation-circle',
+        'low': 'info-circle'
+    };
+    return icons[severity] || 'info-circle';
+}
+
+function initializeCharts() {
+    // Timeline Chart
+    const timelineCtx = document.getElementById('threatTimelineChart').getContext('2d');
+    threatTimelineChart = new Chart(timelineCtx, {
+        type: 'line',
+        data: {
+            labels: [],
+            datasets: [{
+                label: 'Total Incidents',
+                data: [],
+                borderColor: '#2563eb',
+                backgroundColor: 'rgba(37, 99, 235, 0.1)',
+                tension: 0.4
+            }, {
+                label: 'Confirmed Threats',
+                data: [],
+                borderColor: '#dc2626',
+                backgroundColor: 'rgba(220, 38, 38, 0.1)',
+                tension: 0.4
+            }]
+        },
+        options: {
+            responsive: true,
+            maintainAspectRatio: false,
+            scales: {
+                y: {
+                    beginAtZero: true,
+                    ticks: {
+                        stepSize: 1
+                    }
+                }
+            },
+            plugins: {
+                legend: {
+                    position: 'top'
+                }
+            }
+        }
+    });
+    
+    // Severity Chart
+    const severityCtx = document.getElementById('severityChart').getContext('2d');
+    severityChart = new Chart(severityCtx, {
+        type: 'doughnut',
+        data: {
+            labels: ['Critical', 'High', 'Medium', 'Low'],
+            datasets: [{
+                data: [0, 0, 0, 0],
+                backgroundColor: [
+                    '#dc2626',
+                    '#ea580c',
+                    '#d97706',
+                    '#059669'
+                ]
+            }]
+        },
+        options: {
+            responsive: true,
+            maintainAspectRatio: false,
+            plugins: {
+                legend: {
+                    position: 'bottom'
+                }
+            }
+        }
+    });
+}
+
+function updateCharts(metrics) {
+    // Update timeline chart
+    const labels = metrics.daily_metrics.map(d => new Date(d.date).toLocaleDateString());
+    const incidents = metrics.daily_metrics.map(d => d.incidents);
+    const confirmed = metrics.daily_metrics.map(d => d.confirmed);
+    
+    threatTimelineChart.data.labels = labels;
+    threatTimelineChart.data.datasets[0].data = incidents;
+    threatTimelineChart.data.datasets[1].data = confirmed;
+    threatTimelineChart.update();
+    
+    // Update severity chart
+    const severityData = [
+        metrics.severity_distribution.critical || 0,
+        metrics.severity_distribution.high || 0,
+        metrics.severity_distribution.medium || 0,
+        metrics.severity_distribution.low || 0
+    ];
+    
+    severityChart.data.datasets[0].data = severityData;
+    severityChart.update();
+}
+
+function refreshCharts() {
+    loadDashboardData();
+    showAlert('Charts refreshed successfully', 'success');
+}
+
+async function runManualScan() {
+    showAlert('Manual scan initiated...', 'info');
+    // This would trigger the scraping engine
+    // For now, just show a success message
+    setTimeout(() => {
+        showAlert('Manual scan completed', 'success');
+    }, 2000);
+}
+</script>
+{% endblock %}

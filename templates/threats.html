@@ -1,0 +1,668 @@
+{% extends "base.html" %}
+
+{% block title %}Threats - RiskRadar{% endblock %}
+
+{% block content %}
+<div class="d-flex justify-content-between align-items-center mb-4">
+    <h1 class="h3 mb-0">
+        <i class="bi bi-exclamation-triangle me-2"></i>
+        Threat Explorer
+    </h1>
+    <div>
+        <button class="btn btn-outline-primary me-2" onclick="exportThreats()">
+            <i class="bi bi-download me-1"></i>
+            Export
+        </button>
+        <button class="btn btn-primary" onclick="refreshThreats()">
+            <i class="bi bi-arrow-clockwise me-1"></i>
+            Refresh
+        </button>
+    </div>
+</div>
+
+<!-- Threat Statistics -->
+<div class="row mb-4">
+    <div class="col-md-3">
+        <div class="card text-center">
+            <div class="card-body">
+                <h4 class="text-primary mb-1" id="totalThreats">-</h4>
+                <p class="mb-0 text-muted">Total Threats</p>
+            </div>
+        </div>
+    </div>
+    <div class="col-md-3">
+        <div class="card text-center">
+            <div class="card-body">
+                <h4 class="text-success mb-1" id="confirmedThreats">-</h4>
+                <p class="mb-0 text-muted">Confirmed</p>
+            </div>
+        </div>
+    </div>
+    <div class="col-md-3">
+        <div class="card text-center">
+            <div class="card-body">
+                <h4 class="text-warning mb-1" id="pendingThreats">-</h4>
+                <p class="mb-0 text-muted">Pending</p>
+            </div>
+        </div>
+    </div>
+    <div class="col-md-3">
+        <div class="card text-center">
+            <div class="card-body">
+                <h4 class="text-danger mb-1" id="highRiskThreats">-</h4>
+                <p class="mb-0 text-muted">High Risk</p>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Filters and Search -->
+<div class="card mb-4">
+    <div class="card-header">
+        <h5 class="mb-0">
+            <i class="bi bi-funnel me-2"></i>
+            Filters & Search
+        </h5>
+    </div>
+    <div class="card-body">
+        <div class="row">
+            <div class="col-md-3">
+                <label class="form-label">Status</label>
+                <select class="form-select" id="statusFilter">
+                    <option value="">All Statuses</option>
+                    <option value="confirmed">Confirmed</option>
+                    <option value="pending">Pending</option>
+                    <option value="dismissed">Dismissed</option>
+                    <option value="investigating">Investigating</option>
+                </select>
+            </div>
+            <div class="col-md-3">
+                <label class="form-label">Severity</label>
+                <select class="form-select" id="severityFilter">
+                    <option value="">All Severities</option>
+                    <option value="critical">Critical</option>
+                    <option value="high">High</option>
+                    <option value="medium">Medium</option>
+                    <option value="low">Low</option>
+                </select>
+            </div>
+            <div class="col-md-3">
+                <label class="form-label">Source Type</label>
+                <select class="form-select" id="sourceTypeFilter">
+                    <option value="">All Sources</option>
+                    <option value="news">News</option>
+                    <option value="social_media">Social Media</option>
+                    <option value="government">Government</option>
+                    <option value="blog">Blog</option>
+                    <option value="forum">Forum</option>
+                </select>
+            </div>
+            <div class="col-md-3">
+                <label class="form-label">Time Period</label>
+                <select class="form-select" id="timeFilter">
+                    <option value="7">Last 7 days</option>
+                    <option value="30" selected>Last 30 days</option>
+                    <option value="90">Last 90 days</option>
+                    <option value="365">Last year</option>
+                </select>
+            </div>
+        </div>
+        <div class="row mt-3">
+            <div class="col-md-6">
+                <label class="form-label">Search Keywords</label>
+                <input type="text" class="form-control" id="keywordSearch" 
+                       placeholder="Search in titles, descriptions, keywords...">
+            </div>
+            <div class="col-md-3">
+                <label class="form-label">Sort By</label>
+                <select class="form-select" id="sortBy">
+                    <option value="created_at">Date Created</option>
+                    <option value="risk_score">Risk Score</option>
+                    <option value="severity">Severity</option>
+                </select>
+            </div>
+            <div class="col-md-3">
+                <label class="form-label">Sort Order</label>
+                <select class="form-select" id="sortOrder">
+                    <option value="desc">Descending</option>
+                    <option value="asc">Ascending</option>
+                </select>
+            </div>
+        </div>
+        <div class="row mt-3">
+            <div class="col-12">
+                <button class="btn btn-primary me-2" onclick="applyFilters()">
+                    <i class="bi bi-search me-1"></i>
+                    Apply Filters
+                </button>
+                <button class="btn btn-outline-secondary" onclick="clearFilters()">
+                    <i class="bi bi-x-circle me-1"></i>
+                    Clear Filters
+                </button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Bulk Actions -->
+<div class="card mb-4" id="bulkActionsCard" style="display: none;">
+    <div class="card-body">
+        <div class="row align-items-center">
+            <div class="col-md-6">
+                <h6 class="mb-0">Bulk Actions</h6>
+                <small class="text-muted"><span id="selectedCount">0</span> threats selected</small>
+            </div>
+            <div class="col-md-6">
+                <div class="d-flex gap-2 justify-content-end">
+                    <button class="btn btn-sm btn-success" onclick="bulkUpdateStatus('confirmed')">
+                        <i class="bi bi-check-circle me-1"></i>
+                        Confirm
+                    </button>
+                    <button class="btn btn-sm btn-warning" onclick="bulkUpdateStatus('investigating')">
+                        <i class="bi bi-search me-1"></i>
+                        Investigate
+                    </button>
+                    <button class="btn btn-sm btn-secondary" onclick="bulkUpdateStatus('dismissed')">
+                        <i class="bi bi-x-circle me-1"></i>
+                        Dismiss
+                    </button>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Threats Table -->
+<div class="card">
+    <div class="card-header d-flex justify-content-between align-items-center">
+        <h5 class="mb-0">Threats</h5>
+        <div class="d-flex align-items-center">
+            <span class="text-muted me-3" id="threatCount">Loading...</span>
+            <div class="form-check">
+                <input class="form-check-input" type="checkbox" id="selectAll" onchange="toggleSelectAll()">
+                <label class="form-check-label" for="selectAll">Select All</label>
+            </div>
+        </div>
+    </div>
+    <div class="card-body p-0">
+        <div id="threatsTable">
+            <div class="text-center py-5">
+                <div class="spinner-border text-primary" role="status">
+                    <span class="visually-hidden">Loading threats...</span>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Pagination -->
+<nav class="mt-4" id="paginationNav" style="display: none;">
+    <ul class="pagination justify-content-center" id="pagination">
+        <!-- Pagination items will be inserted here -->
+    </ul>
+</nav>
+
+<!-- Threat Details Modal -->
+<div class="modal fade" id="threatModal" tabindex="-1">
+    <div class="modal-dialog modal-xl">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title">Threat Details</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body" id="threatModalBody">
+                <!-- Content loaded dynamically -->
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Close</button>
+                <div class="btn-group">
+                    <button type="button" class="btn btn-success" onclick="updateThreatStatus('confirmed')">
+                        Confirm Threat
+                    </button>
+                    <button type="button" class="btn btn-warning" onclick="updateThreatStatus('investigating')">
+                        Investigate
+                    </button>
+                    <button type="button" class="btn btn-outline-secondary" onclick="updateThreatStatus('dismissed')">
+                        Dismiss
+                    </button>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block extra_scripts %}
+<script>
+let allThreats = [];
+let selectedThreats = new Set();
+let currentThreatId = null;
+let currentPage = 1;
+let totalPages = 1;
+const pageSize = 20;
+
+// Initialize page
+document.addEventListener('DOMContentLoaded', function() {
+    loadThreats();
+    loadThreatStats();
+    
+    // Setup filter event listeners
+    ['statusFilter', 'severityFilter', 'sourceTypeFilter', 'timeFilter', 'sortBy', 'sortOrder'].forEach(id => {
+        document.getElementById(id).addEventListener('change', applyFilters);
+    });
+    
+    // Setup search with debounce
+    let searchTimeout;
+    document.getElementById('keywordSearch').addEventListener('input', function() {
+        clearTimeout(searchTimeout);
+        searchTimeout = setTimeout(applyFilters, 500);
+    });
+});
+
+async function loadThreats() {
+    try {
+        const filters = getFilterParams();
+        const threats = await apiCall(`/api/threats/?${filters}`);
+        
+        allThreats = threats;
+        renderThreatsTable();
+        updateThreatCount();
+        
+    } catch (error) {
+        console.error('Failed to load threats:', error);
+        showAlert('Failed to load threats', 'danger');
+    }
+}
+
+async function loadThreatStats() {
+    try {
+        const timeFilter = document.getElementById('timeFilter').value;
+        const stats = await apiCall(`/api/threats/stats/summary?days_back=${timeFilter}`);
+        
+        document.getElementById('totalThreats').textContent = stats.total_threats;
+        document.getElementById('confirmedThreats').textContent = stats.confirmed_threats;
+        document.getElementById('pendingThreats').textContent = stats.pending_threats;
+        document.getElementById('highRiskThreats').textContent = stats.high_risk_count;
+        
+    } catch (error) {
+        console.error('Failed to load threat stats:', error);
+    }
+}
+
+function getFilterParams() {
+    const params = new URLSearchParams();
+    
+    const status = document.getElementById('statusFilter').value;
+    const severity = document.getElementById('severityFilter').value;
+    const sourceType = document.getElementById('sourceTypeFilter').value;
+    const timeFilter = document.getElementById('timeFilter').value;
+    const keyword = document.getElementById('keywordSearch').value;
+    const sortBy = document.getElementById('sortBy').value;
+    const sortOrder = document.getElementById('sortOrder').value;
+    
+    if (status) params.append('status', status);
+    if (severity) params.append('severity', severity);
+    if (sourceType) params.append('source_type', sourceType);
+    if (timeFilter) params.append('days_back', timeFilter);
+    if (keyword) params.append('keyword', keyword);
+    if (sortBy) params.append('sort_by', sortBy);
+    if (sortOrder) params.append('sort_order', sortOrder);
+    
+    params.append('limit', pageSize);
+    params.append('offset', (currentPage - 1) * pageSize);
+    
+    return params.toString();
+}
+
+function renderThreatsTable() {
+    const container = document.getElementById('threatsTable');
+    
+    if (allThreats.length === 0) {
+        container.innerHTML = '<div class="text-center py-5 text-muted">No threats found matching your criteria</div>';
+        return;
+    }
+    
+    const tableHtml = `
+        <div class="table-responsive">
+            <table class="table table-hover mb-0">
+                <thead class="table-light">
+                    <tr>
+                        <th width="40">
+                            <input type="checkbox" class="form-check-input" id="selectAllTable" onchange="toggleSelectAll()">
+                        </th>
+                        <th>Threat</th>
+                        <th width="100">Severity</th>
+                        <th width="100">Risk Score</th>
+                        <th width="120">Status</th>
+                        <th width="100">Source</th>
+                        <th width="150">Date</th>
+                        <th width="100">Actions</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    ${allThreats.map(threat => renderThreatRow(threat)).join('')}
+                </tbody>
+            </table>
+        </div>
+    `;
+    
+    container.innerHTML = tableHtml;
+}
+
+function renderThreatRow(threat) {
+    const severityClass = `severity-${threat.severity}`;
+    const statusClass = `status-${threat.status}`;
+    
+    return `
+        <tr class="${selectedThreats.has(threat.id) ? 'table-active' : ''}">
+            <td>
+                <input type="checkbox" class="form-check-input threat-checkbox" 
+                       value="${threat.id}" onchange="toggleThreatSelection(${threat.id})">
+            </td>
+            <td>
+                <div class="fw-medium">${threat.title.substring(0, 80)}${threat.title.length > 80 ? '...' : ''}</div>
+                <div class="small text-muted">
+                    ${threat.keywords.slice(0, 3).join(', ')}${threat.keywords.length > 3 ? '...' : ''}
+                </div>
+            </td>
+            <td>
+                <i class="bi bi-${getSeverityIcon(threat.severity)} ${severityClass}"></i>
+                <span class="small ${severityClass}">${threat.severity.toUpperCase()}</span>
+            </td>
+            <td>
+                <span class="badge bg-${getRiskScoreColor(threat.risk_score)}">${threat.risk_score.toFixed(1)}</span>
+            </td>
+            <td>
+                <span class="status-badge ${statusClass}">${threat.status}</span>
+            </td>
+            <td>
+                <span class="small">${getSourceTypeLabel(threat.metadata.source_type || 'unknown')}</span>
+            </td>
+            <td>
+                <span class="small">${formatDate(threat.created_at)}</span>
+            </td>
+            <td>
+                <div class="btn-group btn-group-sm">
+                    <button class="btn btn-outline-primary" onclick="viewThreatDetails(${threat.id})">
+                        <i class="bi bi-eye"></i>
+                    </button>
+                    <button class="btn btn-outline-${threat.status === 'confirmed' ? 'warning' : 'success'}" 
+                            onclick="quickStatusUpdate(${threat.id}, '${threat.status === 'confirmed' ? 'investigating' : 'confirmed'}')">
+                        <i class="bi bi-${threat.status === 'confirmed' ? 'search' : 'check'}"></i>
+                    </button>
+                </div>
+            </td>
+        </tr>
+    `;
+}
+
+function getSeverityIcon(severity) {
+    const icons = {
+        'critical': 'exclamation-triangle-fill',
+        'high': 'exclamation-triangle',
+        'medium': 'exclamation-circle',
+        'low': 'info-circle'
+    };
+    return icons[severity] || 'info-circle';
+}
+
+function getRiskScoreColor(score) {
+    if (score >= 8) return 'danger';
+    if (score >= 6) return 'warning';
+    if (score >= 4) return 'info';
+    return 'success';
+}
+
+function getSourceTypeLabel(sourceType) {
+    const labels = {
+        'news': 'News',
+        'social_media': 'Social',
+        'government': 'Gov',
+        'blog': 'Blog',
+        'forum': 'Forum'
+    };
+    return labels[sourceType] || sourceType;
+}
+
+function toggleThreatSelection(threatId) {
+    if (selectedThreats.has(threatId)) {
+        selectedThreats.delete(threatId);
+    } else {
+        selectedThreats.add(threatId);
+    }
+    
+    updateBulkActions();
+    updateRowHighlight(threatId);
+}
+
+function toggleSelectAll() {
+    const selectAll = document.getElementById('selectAllTable');
+    const checkboxes = document.querySelectorAll('.threat-checkbox');
+    
+    if (selectAll.checked) {
+        checkboxes.forEach(cb => {
+            cb.checked = true;
+            selectedThreats.add(parseInt(cb.value));
+        });
+    } else {
+        checkboxes.forEach(cb => {
+            cb.checked = false;
+            selectedThreats.delete(parseInt(cb.value));
+        });
+    }
+    
+    updateBulkActions();
+    renderThreatsTable(); // Re-render to update highlighting
+}
+
+function updateBulkActions() {
+    const bulkCard = document.getElementById('bulkActionsCard');
+    const selectedCount = document.getElementById('selectedCount');
+    
+    if (selectedThreats.size > 0) {
+        bulkCard.style.display = 'block';
+        selectedCount.textContent = selectedThreats.size;
+    } else {
+        bulkCard.style.display = 'none';
+    }
+}
+
+function updateRowHighlight(threatId) {
+    const row = document.querySelector(`input[value="${threatId}"]`).closest('tr');
+    if (selectedThreats.has(threatId)) {
+        row.classList.add('table-active');
+    } else {
+        row.classList.remove('table-active');
+    }
+}
+
+function updateThreatCount() {
+    document.getElementById('threatCount').textContent = `${allThreats.length} threats`;
+}
+
+async function viewThreatDetails(threatId) {
+    try {
+        const threat = await apiCall(`/api/threats/${threatId}`);
+        displayThreatModal(threat);
+        currentThreatId = threatId;
+        
+    } catch (error) {
+        console.error('Failed to load threat details:', error);
+        showAlert('Failed to load threat details', 'danger');
+    }
+}
+
+function displayThreatModal(threat) {
+    const modalBody = document.getElementById('threatModalBody');
+    
+    modalBody.innerHTML = `
+        <div class="row">
+            <div class="col-md-8">
+                <h6>Threat Information</h6>
+                <div class="mb-3">
+                    <strong>Title:</strong>
+                    <p>${threat.title}</p>
+                </div>
+                <div class="mb-3">
+                    <strong>Description:</strong>
+                    <p>${threat.description || 'No description available'}</p>
+                </div>
+                <div class="mb-3">
+                    <strong>Keywords:</strong>
+                    <div>
+                        ${threat.keywords.map(keyword => `<span class="badge bg-secondary me-1">${keyword}</span>`).join('')}
+                    </div>
+                </div>
+                <div class="mb-3">
+                    <strong>Source URLs:</strong>
+                    <ul class="list-unstyled">
+                        ${threat.source_urls.map(url => `<li><a href="${url}" target="_blank" class="text-break">${url}</a></li>`).join('')}
+                    </ul>
+                </div>
+            </div>
+            <div class="col-md-4">
+                <h6>Risk Assessment</h6>
+                <div class="mb-3">
+                    <div class="d-flex justify-content-between">
+                        <span>Risk Score:</span>
+                        <span class="badge bg-${getRiskScoreColor(threat.risk_score)} fs-6">${threat.risk_score.toFixed(1)}</span>
+                    </div>
+                </div>
+                <div class="mb-3">
+                    <div class="d-flex justify-content-between">
+                        <span>Severity:</span>
+                        <span class="severity-${threat.severity}">${threat.severity.toUpperCase()}</span>
+                    </div>
+                </div>
+                <div class="mb-3">
+                    <div class="d-flex justify-content-between">
+                        <span>Status:</span>
+                        <span class="status-badge status-${threat.status}">${threat.status}</span>
+                    </div>
+                </div>
+                <div class="mb-3">
+                    <div class="d-flex justify-content-between">
+                        <span>Confidence:</span>
+                        <span>${(threat.confidence_score * 100).toFixed(1)}%</span>
+                    </div>
+                </div>
+                <div class="mb-3">
+                    <div class="d-flex justify-content-between">
+                        <span>Sentiment:</span>
+                        <span class="${threat.sentiment_score < 0 ? 'text-danger' : 'text-success'}">${threat.sentiment_score.toFixed(2)}</span>
+                    </div>
+                </div>
+                <div class="mb-3">
+                    <div class="d-flex justify-content-between">
+                        <span>Created:</span>
+                        <span class="small">${formatDate(threat.created_at)}</span>
+                    </div>
+                </div>
+                <div class="mb-3">
+                    <div class="d-flex justify-content-between">
+                        <span>Updated:</span>
+                        <span class="small">${formatDate(threat.updated_at)}</span>
+                    </div>
+                </div>
+            </div>
+        </div>
+    `;
+    
+    const modal = new bootstrap.Modal(document.getElementById('threatModal'));
+    modal.show();
+}
+
+async function updateThreatStatus(newStatus) {
+    if (!currentThreatId) return;
+    
+    try {
+        const result = await apiCall(`/api/threats/${currentThreatId}/status`, {
+            method: 'PUT',
+            body: JSON.stringify({ new_status: newStatus })
+        });
+        
+        showAlert(result.message, 'success');
+        bootstrap.Modal.getInstance(document.getElementById('threatModal')).hide();
+        loadThreats(); // Refresh the list
+        loadThreatStats(); // Refresh stats
+        
+    } catch (error) {
+        console.error('Failed to update threat status:', error);
+        showAlert('Failed to update threat status', 'danger');
+    }
+}
+
+async function quickStatusUpdate(threatId, newStatus) {
+    try {
+        const result = await apiCall(`/api/threats/${threatId}/status`, {
+            method: 'PUT',
+            body: JSON.stringify({ new_status: newStatus })
+        });
+        
+        showAlert(result.message, 'success');
+        loadThreats(); // Refresh the list
+        loadThreatStats(); // Refresh stats
+        
+    } catch (error) {
+        console.error('Failed to update threat status:', error);
+        showAlert('Failed to update threat status', 'danger');
+    }
+}
+
+async function bulkUpdateStatus(newStatus) {
+    if (selectedThreats.size === 0) return;
+    
+    const threatIds = Array.from(selectedThreats);
+    
+    try {
+        const result = await apiCall('/api/threats/bulk-update', {
+            method: 'POST',
+            body: JSON.stringify({
+                threat_ids: threatIds,
+                action: 'status',
+                value: newStatus
+            })
+        });
+        
+        showAlert(result.message, 'success');
+        selectedThreats.clear();
+        updateBulkActions();
+        loadThreats(); // Refresh the list
+        loadThreatStats(); // Refresh stats
+        
+    } catch (error) {
+        console.error('Bulk update failed:', error);
+        showAlert('Bulk update failed', 'danger');
+    }
+}
+
+function applyFilters() {
+    currentPage = 1; // Reset to first page
+    loadThreats();
+    loadThreatStats();
+}
+
+function clearFilters() {
+    document.getElementById('statusFilter').value = '';
+    document.getElementById('severityFilter').value = '';
+    document.getElementById('sourceTypeFilter').value = '';
+    document.getElementById('timeFilter').value = '30';
+    document.getElementById('keywordSearch').value = '';
+    document.getElementById('sortBy').value = 'created_at';
+    document.getElementById('sortOrder').value = 'desc';
+    
+    applyFilters();
+}
+
+function refreshThreats() {
+    loadThreats();
+    loadThreatStats();
+    showAlert('Threats refreshed', 'success');
+}
+
+async function exportThreats() {
+    showAlert('Export functionality coming soon', 'info');
+    // This would generate CSV/JSON export of filtered threats
+}
+</script>
+{% endblock %}

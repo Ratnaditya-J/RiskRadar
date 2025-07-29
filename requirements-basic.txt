@@ -1,0 +1,19 @@
+# Core web framework
+fastapi
+uvicorn[standard]
+jinja2
+python-multipart
+
+# Database
+sqlalchemy
+
+# Web scraping
+requests
+beautifulsoup4
+lxml
+user-agent
+requests-ratelimiter
+
+# Basic utilities
+python-dateutil
+psutil
