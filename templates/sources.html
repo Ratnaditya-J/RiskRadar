@@ -13,9 +13,13 @@
             <i class="bi bi-arrow-clockwise me-1"></i>
             Refresh
         </button>
-        <button class="btn btn-success" onclick="enableAllSources()">
+        <button class="btn btn-outline-success me-2" onclick="enableAllSources()">
             <i class="bi bi-check-all me-1"></i>
             Enable All
+        </button>
+        <button class="btn btn-primary" onclick="showAddSourceModal()">
+            <i class="bi bi-plus-circle me-1"></i>
+            Add Source
         </button>
     </div>
 </div>
@@ -103,6 +107,91 @@
             <div class="modal-footer">
                 <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Close</button>
                 <button type="button" class="btn btn-primary" onclick="saveSourceChanges()">Save Changes</button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Add Source Modal -->
+<div class="modal fade" id="addSourceModal" tabindex="-1">
+    <div class="modal-dialog modal-lg">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title">
+                    <i class="bi bi-plus-circle me-2"></i>
+                    Add New Source
+                </h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body">
+                <form id="addSourceForm">
+                    <div class="row">
+                        <div class="col-md-6">
+                            <div class="mb-3">
+                                <label for="sourceName" class="form-label">Source Name *</label>
+                                <input type="text" class="form-control" id="sourceName" name="name" required
+                                       placeholder="e.g., TechCrunch Security">
+                                <div class="form-text">Unique name for this source</div>
+                            </div>
+                        </div>
+                        <div class="col-md-6">
+                            <div class="mb-3">
+                                <label for="sourceType" class="form-label">Source Type *</label>
+                                <select class="form-select" id="sourceType" name="source_type" required>
+                                    <option value="">Select source type...</option>
+                                </select>
+                                <div class="form-text">Type of content source</div>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <div class="mb-3">
+                        <label for="urlPattern" class="form-label">URL Pattern *</label>
+                        <input type="url" class="form-control" id="urlPattern" name="url_pattern" required
+                               placeholder="https://example.com/security-news">
+                        <div class="form-text">Base URL or RSS feed URL for scraping</div>
+                    </div>
+                    
+                    <div class="row">
+                        <div class="col-md-6">
+                            <div class="mb-3">
+                                <label for="rateLimit" class="form-label">Rate Limit (seconds)</label>
+                                <input type="number" class="form-control" id="rateLimit" name="rate_limit" 
+                                       value="60" min="1" max="3600">
+                                <div class="form-text">Delay between requests (1-3600 seconds)</div>
+                            </div>
+                        </div>
+                        <div class="col-md-6">
+                            <div class="mb-3">
+                                <label for="reliabilityScore" class="form-label">Reliability Score</label>
+                                <input type="number" class="form-control" id="reliabilityScore" name="reliability_score" 
+                                       value="0.8" min="0" max="1" step="0.1">
+                                <div class="form-text">Trust score (0.0 - 1.0)</div>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <div class="mb-3">
+                        <label for="keywords" class="form-label">Keywords (Optional)</label>
+                        <input type="text" class="form-control" id="keywords" name="keywords" 
+                               placeholder="security, vulnerability, breach, malware">
+                        <div class="form-text">Comma-separated keywords to filter content</div>
+                    </div>
+                    
+                    <div class="form-check">
+                        <input class="form-check-input" type="checkbox" id="sourceEnabled" name="enabled" checked>
+                        <label class="form-check-label" for="sourceEnabled">
+                            Enable source immediately
+                        </label>
+                    </div>
+                </form>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+                <button type="button" class="btn btn-primary" onclick="createNewSource()">
+                    <i class="bi bi-plus-circle me-1"></i>
+                    Create Source
+                </button>
             </div>
         </div>
     </div>
@@ -488,6 +577,80 @@ async function saveSourceChanges() {
 function refreshSources() {
     loadSources();
     showAlert('Sources refreshed', 'success');
+}
+
+// Add Source Modal Functions
+async function showAddSourceModal() {
+    try {
+        // Load source types for dropdown
+        const sourceTypes = await apiCall('/api/sources/types');
+        populateSourceTypes(sourceTypes.types);
+        
+        // Reset form
+        document.getElementById('addSourceForm').reset();
+        document.getElementById('sourceEnabled').checked = true;
+        
+        // Show modal
+        const modal = new bootstrap.Modal(document.getElementById('addSourceModal'));
+        modal.show();
+        
+    } catch (error) {
+        console.error('Failed to load source types:', error);
+        showAlert('Failed to load source types', 'danger');
+    }
+}
+
+function populateSourceTypes(types) {
+    const select = document.getElementById('sourceType');
+    select.innerHTML = '<option value="">Select source type...</option>';
+    
+    types.forEach(type => {
+        const option = document.createElement('option');
+        option.value = type.value;
+        option.textContent = `${type.label} - ${type.description}`;
+        select.appendChild(option);
+    });
+}
+
+async function createNewSource() {
+    const form = document.getElementById('addSourceForm');
+    const formData = new FormData(form);
+    
+    // Validate required fields
+    if (!formData.get('name') || !formData.get('source_type') || !formData.get('url_pattern')) {
+        showAlert('Please fill in all required fields', 'warning');
+        return;
+    }
+    
+    // Prepare source data
+    const sourceData = {
+        name: formData.get('name').trim(),
+        source_type: formData.get('source_type'),
+        url_pattern: formData.get('url_pattern').trim(),
+        rate_limit: parseInt(formData.get('rate_limit')) || 60,
+        reliability_score: parseFloat(formData.get('reliability_score')) || 0.8,
+        enabled: formData.get('enabled') === 'on',
+        keywords: formData.get('keywords') ? 
+            formData.get('keywords').split(',').map(k => k.trim()).filter(k => k) : []
+    };
+    
+    try {
+        const newSource = await apiCall('/api/sources/', {
+            method: 'POST',
+            body: JSON.stringify(sourceData)
+        });
+        
+        showAlert(`Source "${newSource.name}" created successfully!`, 'success');
+        
+        // Hide modal and refresh sources
+        bootstrap.Modal.getInstance(document.getElementById('addSourceModal')).hide();
+        loadSources();
+        
+    } catch (error) {
+        console.error('Failed to create source:', error);
+        const errorMessage = error.detail || 'Failed to create source';
+        showAlert(errorMessage, 'danger');
+    }
 }
 </script>
 {% endblock %}

@@ -5,14 +5,25 @@ API router for source management endpoints.
 from fastapi import APIRouter, Depends, HTTPException, Query
 from sqlalchemy.orm import Session
 from typing import List, Optional
+from pydantic import BaseModel, Field
 import logging
 
 from ...core.database import get_db
 from ...core.models import DataSourceORM, DataSource, SourceType
-from ...config.default_sources import get_source_categories
+from ...config.default_sources import get_source_categories as get_default_source_categories
 
 router = APIRouter()
 logger = logging.getLogger(__name__)
+
+class CreateSourceRequest(BaseModel):
+    """Request model for creating a new source."""
+    name: str = Field(..., min_length=1, max_length=100, description="Source name")
+    source_type: str = Field(..., description="Source type (news, blog, social_media, government, forum)")
+    url_pattern: str = Field(..., min_length=1, description="URL pattern for scraping")
+    keywords: Optional[List[str]] = Field(default=[], description="Keywords to filter content")
+    rate_limit: Optional[int] = Field(default=60, ge=1, le=3600, description="Rate limit in seconds")
+    reliability_score: Optional[float] = Field(default=0.8, ge=0.0, le=1.0, description="Reliability score")
+    enabled: Optional[bool] = Field(default=True, description="Whether source is enabled")
 
 @router.get("/", response_model=List[DataSource])
 async def get_sources(
@@ -42,9 +53,60 @@ async def get_sources(
 async def get_source_categories():
     """Get source categories for UI organization."""
     try:
-        return get_source_categories()
+        return get_default_source_categories()
     except Exception as e:
         logger.error(f"Error fetching source categories: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+@router.get("/types")
+async def get_source_types():
+    """Get available source types for UI dropdown."""
+    try:
+        return {
+            "types": [
+                {
+                    "value": st.value,
+                    "label": st.value.replace('_', ' ').title(),
+                    "description": {
+                        "news": "News websites and publications",
+                        "blog": "Security blogs and expert commentary",
+                        "social_media": "Social media platforms (Twitter, Reddit, etc.)",
+                        "government": "Government security advisories and alerts",
+                        "forum": "Security forums and discussion boards"
+                    }.get(st.value, "Custom source type")
+                }
+                for st in SourceType
+            ]
+        }
+    except Exception as e:
+        logger.error(f"Error fetching source types: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+@router.get("/stats/summary")
+async def get_source_stats(db: Session = Depends(get_db)):
+    """Get source statistics summary."""
+    try:
+        total_sources = db.query(DataSourceORM).count()
+        enabled_sources = db.query(DataSourceORM).filter(DataSourceORM.enabled == True).count()
+        
+        # Count by source type
+        type_counts = {}
+        for source_type in SourceType:
+            count = db.query(DataSourceORM).filter(
+                DataSourceORM.source_type == source_type.value
+            ).count()
+            type_counts[source_type.value] = count
+        
+        return {
+            "total_sources": total_sources,
+            "enabled_sources": enabled_sources,
+            "disabled_sources": total_sources - enabled_sources,
+            "by_type": type_counts,
+            "enabled_percentage": round((enabled_sources / max(1, total_sources)) * 100, 1)
+        }
+        
+    except Exception as e:
+        logger.error(f"Error fetching source stats: {e}")
         raise HTTPException(status_code=500, detail=str(e))
 
 @router.get("/{source_id}", response_model=DataSource)
@@ -161,29 +223,53 @@ async def bulk_toggle_sources(
         db.rollback()
         raise HTTPException(status_code=500, detail=str(e))
 
-@router.get("/stats/summary")
-async def get_source_stats(db: Session = Depends(get_db)):
-    """Get source statistics summary."""
+@router.post("/", response_model=DataSource)
+async def create_source(
+    source_data: CreateSourceRequest,
+    db: Session = Depends(get_db)
+):
+    """Create a new source."""
     try:
-        total_sources = db.query(DataSourceORM).count()
-        enabled_sources = db.query(DataSourceORM).filter(DataSourceORM.enabled == True).count()
+        # Validate source type
+        valid_types = [st.value for st in SourceType]
+        if source_data.source_type not in valid_types:
+            raise HTTPException(
+                status_code=400, 
+                detail=f"Invalid source type. Must be one of: {', '.join(valid_types)}"
+            )
         
-        # Count by source type
-        type_counts = {}
-        for source_type in SourceType:
-            count = db.query(DataSourceORM).filter(
-                DataSourceORM.source_type == source_type.value
-            ).count()
-            type_counts[source_type.value] = count
+        # Check if source name already exists
+        existing_source = db.query(DataSourceORM).filter(
+            DataSourceORM.name == source_data.name
+        ).first()
         
-        return {
-            "total_sources": total_sources,
-            "enabled_sources": enabled_sources,
-            "disabled_sources": total_sources - enabled_sources,
-            "by_type": type_counts,
-            "enabled_percentage": round((enabled_sources / max(1, total_sources)) * 100, 1)
-        }
+        if existing_source:
+            raise HTTPException(
+                status_code=400, 
+                detail=f"Source with name '{source_data.name}' already exists"
+            )
         
+        # Create new source
+        new_source = DataSourceORM(
+            name=source_data.name,
+            source_type=source_data.source_type,
+            url_pattern=source_data.url_pattern,
+            keywords=source_data.keywords or [],
+            rate_limit=source_data.rate_limit,
+            enabled=source_data.enabled
+        )
+        
+        db.add(new_source)
+        db.commit()
+        db.refresh(new_source)
+        
+        logger.info(f"Created new source: {new_source.name} ({new_source.source_type})")
+        
+        return DataSource.from_orm(new_source)
+        
+    except HTTPException:
+        raise
     except Exception as e:
-        logger.error(f"Error fetching source stats: {e}")
+        logger.error(f"Error creating source: {e}")
+        db.rollback()
         raise HTTPException(status_code=500, detail=str(e))
